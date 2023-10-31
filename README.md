@@ -1,5 +1,5 @@
 # NHL-Data-Processing
-## Focus Areas
+## Assignment Focus Areas
 - Web Crawling
 - Vertical and Horizontal Integration
 - Data Processing and Cleaning Techniques
