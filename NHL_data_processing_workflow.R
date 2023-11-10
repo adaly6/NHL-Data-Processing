@@ -16,7 +16,7 @@ for (i in 1:24) {
        url <- paste("https://www.scrapethissite.com/pages/forms/?page_num=", i, sep = "")
 
        # Read the HTML on the website and use a user agent to follow best practices of web crawling
-       page <- read_html(url, user_agent)
+       page <- read_html(url)
 
        # Sleep for 5 seconds to follow best practices of web crawling
        Sys.sleep(5)
