@@ -2,7 +2,9 @@
 ## Assignment Focus Areas
 - Web Crawling
 - Vertical and Horizontal Integration
-- Data Processing and Cleaning Techniques
+- Data Preprocessing and Cleaning Techniques
+- Data Modeling using ggplot
+- R Markdown to Accompany R script
 
 ### Overview and Purpose
 The R Markdown file, accompanied by an HTML output, serves as a dynamic and accessible medium for conveying data analysis and visualizations. By encapsulating code, results, and narratives in a single document, it becomes an invaluable tool for both programmers and non-programmers.
