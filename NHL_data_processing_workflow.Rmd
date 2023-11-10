@@ -1,0 +1,324 @@
+---
+title: "NHL Data Analysis"
+author: "Andrew Daly"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    fig_caption: true
+    css: "custom-style.css"
+params:
+  state: "hawaii"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prerequisites
+
+You will need GGPlot and XML2.
+These can be insalled by running:  
+  **install.packages("ggplot2")**  
+  **install.packages("xml2")**  
+  
+  
+## Details
+In this assignment I will demonstrate how to scrape, clean and combine data sets. In addition, I will demonstrate how to generate summary statistics and simple plots. I will be scraping initial NHL data from [Scrape This Site](https://www.scrapethissite.com/pages/forms/).  
+
+
+Clear your environment.
+```{r}
+rm(list = ls())
+```
+  
+  
+### Create initial data frame with scraped data
+
+Load XML library to parse results from the web pages.
+```{r}
+library(xml2)
+```
+  
+  
+Initialize empty vectors to hold data scraped from the web pages.
+```{r}
+all_team <- character(0)
+all_year <- character(0)
+all_wins <- character(0)
+all_losses <- character(0)
+```
+  
+  
+Scrape the hockey data from _Scrape This Site_
+```{r}
+for (i in 1:24) { # 24 pages of data
+
+  Sys.sleep(5) # Add 5-second wait time
+
+  # Paste number (1, 2, 3, ...) at end of base URL
+  url <- paste("https://www.scrapethissite.com/pages/forms/?page_num=", i, sep = "")
+  page <- read_html(url)
+
+  team <- xml_text(xml_find_all(page, "//tr/td[1]"))
+  all_team <- c(all_team, team) # Append to names vector
+
+  year <- xml_text(xml_find_all(page, "//tr/td[2]"))
+  all_year <- c(all_year, year) # Append to years vector
+
+  wins <- xml_text(xml_find_all(page, "//tr/td[3]"))
+  all_wins <- c(all_wins, wins) # Append to wins vector
+
+  losses <- xml_text(xml_find_all(page, "//tr/td[4]"))
+  all_losses <- c(all_losses, losses) # Append to losses vector
+
+  # Wait a random amount of time before moving to the next page
+  random_value <- sample(2:20, 1)
+  Sys.sleep(random_value)
+}
+```
+  
+  
+  
+Combine individual vectors into a data frame.
+```{r}
+nhl0 <- data.frame(all_team, all_year, all_wins, all_losses)
+colnames(nhl0) <- c("team", "year", "wins", "losses")
+```
+
+
+### Clean the data.  
+
+ - Remove white space.
+```{r}
+nhl0$team <- trimws(nhl0$team)
+nhl0$year <- trimws(nhl0$year)
+nhl0$wins <- trimws(nhl0$wins)
+nhl0$losses <- trimws(nhl0$losses)
+```
+  
+  
+Convert Year, Wins, and Losses columns to Integer data type.
+```{r}
+nhl0$year <- as.integer(nhl0$year)
+nhl0$wins <- as.integer(nhl0$wins)
+nhl0$losses <- as.integer(nhl0$losses)
+```
+  
+  
+Review the column names and data types in the data frame.
+```{r}
+str(nhl0)
+```
+  
+  
+Review the first 10 rows of data in the data frame.
+```{r echo=FALSE}
+nhl0[1:10, ]
+```
+  
+
+### Import additional data for integration
+
+Read excel file for more corresponding NHL data.
+```{r}
+library(readxl)
+nhl_expanded <- read_excel("nhl_2012-2021.xlsx")
+```  
+
+
+- Clean and transform 2012-2021 NHL data to integrate with scrapped data.
+```{r echo=FALSE}
+names(nhl_expanded)[names(nhl_expanded) == "Team"] <- "team"
+names(nhl_expanded)[names(nhl_expanded) == "W"] <- "wins"
+names(nhl_expanded)[names(nhl_expanded) == "L"] <- "losses"
+names(nhl_expanded)[names(nhl_expanded) == "Season"] <- "year"
+nhl_expanded$year <- as.integer(nhl_expanded$year)
+nhl_expanded$wins <- as.integer(nhl_expanded$wins)
+nhl_expanded$losses <- as.integer(nhl_expanded$losses)
+
+nhl_expanded$team <- gsub("\\*$", "", nhl_expanded$team)
+```  
+
+
+Remove additional columns in NHL expanded data frame by creating another data frame with relevant columns.
+```{r}
+nhl_expanded2 <- data.frame(nhl_expanded$team, nhl_expanded$year, nhl_expanded$wins, nhl_expanded$losses)
+colnames(nhl_expanded2) <- c("team", "year", "wins", "losses")
+```
+
+
+Merge the two data frames vertically. The data will share the same variables and increase in observation depth
+```{r}
+nhl2 <- rbind(nhl0, nhl_expanded2)
+```
+
+
+Create a new variable for win percentage. The table below shows the addition of the win percentage column.
+``` {r echo=FALSE}
+nhl2$Win_percentage <- round((nhl2$wins / (nhl2$wins + nhl2$losses)), 2)
+```
+```{r echo=FALSE}
+data <- head(nhl2, 4)
+knitr::kable(data)
+```
+
+
+### Import NHL arena data for integration
+
+
+Import and read the NHL arenas comma separated values file.
+```{r}
+arena <- read.csv("nhl_hockey_arenas.csv")
+```
+
+
+Rename the columns in arena to match the other data frame for integration.
+```{r echo=FALSE}
+names(arena)[names(arena) == "Team.Name"] <- "team"
+names(arena)[names(arena) == "Arena.Name"] <- "arena"
+names(arena)[names(arena) == "Arena.Location"] <- "location"
+names(arena)[names(arena) == "Seating.Capacity"] <- "capacity"
+```
+
+
+Drop unnecessary columns in the arena data frame.
+```{r}
+arena$Opening.Year <- NULL
+```
+
+
+Output the first 5 rows of data in the arena data frame.
+```{r echo=FALSE}
+head(arena, 5)
+```
+
+
+Check for spelling errors within the team name column. Some teams may have adapted new names over the years.
+```{r echo=FALSE}
+error <- unique(arena$team)
+error
+```
+
+
+Correct the misspelled data and modernize team names from the same franchise.
+```{r}
+arena$team <- ifelse(arena$team == "Seattle Kracken", "Seattle Kraken", arena$team)
+nhl2$team <- ifelse(nhl2$team == "Mighty Ducks of Anaheim", "Anaheim Ducks", nhl2$team)
+```
+
+
+Merge the data horizontally, whereby adding more columns to the existing data frame
+```{r}
+nhl <- merge(nhl2, arena, by = "team", all.x = TRUE)
+head(nhl, 5)
+```
+
+
+The New York Islanders have two accounts of an arena. They built a new arena in 2012, write if else statements to correctly match the year to the arena for the New York Islanders.
+```{r}
+nhl$arena <- ifelse(nhl$team == "New York Islanders",
+  ifelse(nhl$year >= 2012, "Nassau Coliseum",
+    ifelse(nhl$year < 2012, "Barclays Center", nhl$arena)
+  ),
+  nhl$arena
+)
+
+nhl$location <- ifelse(nhl$team == "New York Islanders",
+  ifelse(nhl$arena == "Nassau Coliseum", "Uniondale, New York",
+    ifelse(nhl$arena == "Barclays Center", "Brooklyn, New York", nhl$location)
+  ),
+  nhl$location
+)
+
+nhl$capacity <- ifelse(nhl$team == "New York Islanders",
+  ifelse(nhl$arena == "Nassau Coliseum", 13900,
+    ifelse(nhl$arena == "Barclays Center", 15795, nhl$capacity)
+  ),
+  nhl$capacity
+)
+```
+
+
+The above command creates exact duplicates, multiple rows containing the same data. Remove those rows.
+```{r}
+nhl <- nhl[!duplicated(nhl), ]
+```
+
+
+Save the final data frame to a comma separated values file without row names.
+```{r}
+write.csv(nhl, "hockey_data.csv", row.names = FALSE)
+```
+
+
+## Data Modeling 
+
+### 1990 Teams Winning More Than 50% Of Regular Season Games
+
+Embed ggplot listing all NHL teams that won more than 40 of the 80 regular season games in 1990.
+```{r pressure, echo=FALSE}
+library(ggplot2)
+
+ggplot(nhl[which(nhl$year == 1990 & nhl$wins > 40), c("team", "wins")], aes(x = reorder(team, wins), y = wins, fill = team)) +
+  geom_bar(stat = "identity", width = .75) +
+  coord_flip() +
+  theme(legend.position = "none") +
+  ggtitle("NHL Teams > 40 Wins in 1990") +
+  xlab("NHL Team") +
+  ylab("Wins")
+```
+  
+
+### Philadelphia Flyers Wins Each Season
+```{r pressure1, echo=FALSE}
+flyers_data <- nhl[nhl$team == "Philadelphia Flyers", ]
+ggplot(flyers_data, aes(x = year, y = wins, color = team)) +
+  geom_line() +
+  ggtitle("Philadelphia Flyers Wins Over the Years") +
+  xlab("Year") +
+  ylab("Wins") +
+  theme_minimal()
+```
+
+
+### Distribution of Win Percentages by Team
+```{r pressure2, echo=FALSE}
+ggplot(nhl, aes(x = team, y = Win_percentage, fill = team)) +
+  geom_boxplot() +
+  ggtitle("Distribution of Win Percentages by Team") +
+  xlab("NHL Team") +
+  ylab("Win Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+### NHL Win Percentage Over the Years
+```{r pressure3, echo=FALSE}
+ggplot(nhl, aes(x = year, y = Win_percentage, fill = team)) +
+  geom_bar(stat = "identity") +
+  ggtitle("NHL Win Percentage Over the Years") +
+  xlab("Year") +
+  ylab("Win Percentage") +
+  theme_minimal()
+```
+
+
+### NHL Arena Capacities
+```{r pressure4, echo=FALSE}
+ggplot(nhl, aes(x = reorder(team, -capacity), y = capacity, fill = team)) +
+  geom_bar(stat = "identity") +
+  ggtitle("NHL Arena Capacities") +
+  xlab("NHL Team") +
+  ylab("Capacity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = FALSE)
+```
+
+  
