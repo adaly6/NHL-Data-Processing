@@ -1,7 +1,3 @@
-Certainly! Here's a more README-friendly overview for your NHL Data Processing script:
-
----
-
 # NHL Data Processing
 
 ## Assignment Focus Areas
